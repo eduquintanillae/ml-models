@@ -1,0 +1,2 @@
+Subject: Password reset confirmation
+Your password has been successfully reset. If you did not request this change, please contact our security team immediately. Your account security is important to us.
