@@ -1,13 +1,22 @@
-from typing import List
 import math
-from typing import Any
-from collections import Counter
-from typing import NamedTuple, Optional
-from typing import Dict, TypeVar
-from collections import defaultdict
-from typing import NamedTuple, Union, Any
+from typing import Any, Dict, TypeVar, NamedTuple, Union, Any, Optional, List
+from collections import Counter, defaultdict
 T = TypeVar('T')  # generic type for inputs
 
+class Candidate(NamedTuple):
+    level: str
+    lang: str
+    tweets: bool
+    phd: bool
+    did_well: Optional[bool] = None  # allow unlabeled data
+
+class Leaf(NamedTuple):
+    value: Any
+
+class Split(NamedTuple):
+    attribute: str
+    subtrees: dict
+    default_value: Any = None
 
 def entropy(class_probabilities: List[float]) -> float:
     """Given a list of class probabilities, compute the entropy"""
@@ -30,32 +39,6 @@ def partition_entropy(subsets: List[List[Any]]) -> float:
     return sum(data_entropy(subset) * len(subset) / total_count
                for subset in subsets)
 
-
-class Candidate(NamedTuple):
-    level: str
-    lang: str
-    tweets: bool
-    phd: bool
-    did_well: Optional[bool] = None  # allow unlabeled data
-
-                  #  level     lang     tweets  phd  did_well
-inputs = [Candidate('Senior', 'Java',   False, False, False),
-          Candidate('Senior', 'Java',   False, True,  False),
-          Candidate('Mid',    'Python', False, False, True),
-          Candidate('Junior', 'Python', False, False, True),
-          Candidate('Junior', 'R',      True,  False, True),
-          Candidate('Junior', 'R',      True,  True,  False),
-          Candidate('Mid',    'R',      True,  True,  True),
-          Candidate('Senior', 'Python', False, False, False),
-          Candidate('Senior', 'R',      True,  False, True),
-          Candidate('Junior', 'Python', True,  False, True),
-          Candidate('Senior', 'Python', True,  True,  True),
-          Candidate('Mid',    'Python', False, True,  True),
-          Candidate('Mid',    'Java',   True,  False, True),
-          Candidate('Junior', 'Python', False, True,  False)
-         ]
-
-
 def partition_by(inputs: List[T], attribute: str) -> Dict[Any, List[T]]:
     """Partition the inputs into lists based on the specified attribute."""
     partitions: Dict[Any, List[T]] = defaultdict(list)
@@ -77,28 +60,6 @@ def partition_entropy_by(inputs: List[Any],
 
     return partition_entropy(labels)
 
-
-class Leaf(NamedTuple):
-    value: Any
-
-class Split(NamedTuple):
-    attribute: str
-    subtrees: dict
-    default_value: Any = None
-
-DecisionTree = Union[Leaf, Split]
-
-hiring_tree = Split('level', {   # First, consider "level".
-    'Junior': Split('phd', {     # if level is "Junior", next look at "phd"
-        False: Leaf(True),       #   if "phd" is False, predict True
-        True: Leaf(False)        #   if "phd" is True, predict False
-    }),
-    'Mid': Leaf(True),           # if level is "Mid", just predict True
-    'Senior': Split('tweets', {  # if level is "Senior", look at "tweets"
-        False: Leaf(False),      #   if "tweets" is False, predict False
-        True: Leaf(True)         #   if "tweets" is True, predict True
-    })
-})
 
 def classify(tree: DecisionTree, input: Any) -> Any:
     """classify the input using the given decision tree"""
@@ -151,7 +112,37 @@ def build_tree_id3(inputs: List[Any],
                                                  target_attribute)
                 for attribute_value, subset in partitions.items()}
 
-    return Split(best_attribute, subtrees, default_value=most_common_label)
+    return Split(best_attribute, subtrees, default_value=most_common_label)    
+
+inputs = [Candidate('Senior', 'Java',   False, False, False),
+          Candidate('Senior', 'Java',   False, True,  False),
+          Candidate('Mid',    'Python', False, False, True),
+          Candidate('Junior', 'Python', False, False, True),
+          Candidate('Junior', 'R',      True,  False, True),
+          Candidate('Junior', 'R',      True,  True,  False),
+          Candidate('Mid',    'R',      True,  True,  True),
+          Candidate('Senior', 'Python', False, False, False),
+          Candidate('Senior', 'R',      True,  False, True),
+          Candidate('Junior', 'Python', True,  False, True),
+          Candidate('Senior', 'Python', True,  True,  True),
+          Candidate('Mid',    'Python', False, True,  True),
+          Candidate('Mid',    'Java',   True,  False, True),
+          Candidate('Junior', 'Python', False, True,  False)
+         ]
+
+DecisionTree = Union[Leaf, Split]
+
+hiring_tree = Split('level', {   # First, consider "level".
+    'Junior': Split('phd', {     # if level is "Junior", next look at "phd"
+        False: Leaf(True),       #   if "phd" is False, predict True
+        True: Leaf(False)        #   if "phd" is True, predict False
+    }),
+    'Mid': Leaf(True),           # if level is "Mid", just predict True
+    'Senior': Split('tweets', {  # if level is "Senior", look at "tweets"
+        False: Leaf(False),      #   if "tweets" is False, predict False
+        True: Leaf(True)         #   if "tweets" is True, predict True
+    })
+})
 
 tree = build_tree_id3(inputs,
                       ['level', 'lang', 'tweets', 'phd'],
