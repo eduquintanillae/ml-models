@@ -72,7 +72,7 @@ def main():
     gd = GradientDescent()
     inputs = [(x, 20 * x + 5) for x in range(-50, 50)]
     
-    # Generate some linear data with noise
+    # Linear data with noise
     xs = range(-10, 11)
     actuals = [gd.derivative(x) for x in xs]
     estimates = [gd.difference_quotient(gd.square, x, h=0.001) for x in xs]
@@ -92,7 +92,7 @@ def main():
         v = gd.gradient_step(v, grad, -0.01)    # take a negative gradient step
         print(epoch, v)
     
-    assert distance(v, [0, 0, 0]) < 0.001    # v should be close to 0
+    assert distance(v, [0, 0, 0]) < 0.001
     
     
     # Using Gradient Descent to Fit Models
@@ -108,7 +108,6 @@ def main():
     slope, intercept = theta
     assert 19.9 < slope < 20.1,   "slope should be about 20"
     assert 4.9 < intercept < 5.1, "intercept should be about 5"
-    
     
     # Minibatch gradient descent example
     theta = [random.uniform(-1, 1), random.uniform(-1, 1)]
@@ -136,4 +135,5 @@ def main():
     assert 19.9 < slope < 20.1,   "slope should be about 20"
     assert 4.9 < intercept < 5.1, "intercept should be about 5"
     
-if __name__ == "__main__": main()
+if __name__ == "__main__": 
+    main()
