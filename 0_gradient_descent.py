@@ -27,7 +27,7 @@ class GradientDescent:
                                     i: int,
                                     h: float) -> float:
         """Returns the i-th partial difference quotient of f at v"""
-        w = [v_j + (h if j == i else 0)    # add h to just the ith element of v
+        w = [v_j + (h if j == i else 0)
              for j, v_j in enumerate(v)]
     
         return (f(w) - f(v)) / h
@@ -50,10 +50,10 @@ class GradientDescent:
 
     def linear_gradient(self, x: float, y: float, theta: Vector) -> Vector:
         slope, intercept = theta
-        predicted = slope * x + intercept    # The prediction of the model.
-        error = (predicted - y)              # error is (predicted - actual)
-        squared_error = error ** 2           # We'll minimize squared error
-        grad = [2 * error * x, 2 * error]    # using its gradient.
+        predicted = slope * x + intercept
+        error = (predicted - y)
+        squared_error = error ** 2
+        grad = [2 * error * x, 2 * error]
         return grad
 
     def minibatches(self, dataset: List[T],
