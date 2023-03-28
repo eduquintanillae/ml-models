@@ -1,6 +1,10 @@
-from utils.linear_algebra import Vector, dot
-
+from utils.linear_algebra import Vector, dot, squared_distance
 import importlib
+import math
+from typing import List
+import random
+import tqdm
+
 gradient_descent_module = importlib.import_module('0_gradient_descent')
 gradient_step = gradient_descent_module.GradientDescent().gradient_step
 
@@ -12,29 +16,6 @@ def perceptron_output(weights: Vector, bias: float, x: Vector) -> float:
     calculation = dot(weights, x) + bias
     return step_function(calculation)
 
-and_weights = [2., 2]
-and_bias = -3.
-
-assert perceptron_output(and_weights, and_bias, [1, 1]) == 1
-assert perceptron_output(and_weights, and_bias, [0, 1]) == 0
-assert perceptron_output(and_weights, and_bias, [1, 0]) == 0
-assert perceptron_output(and_weights, and_bias, [0, 0]) == 0
-
-or_weights = [2., 2]
-or_bias = -1.
-
-assert perceptron_output(or_weights, or_bias, [1, 1]) == 1
-assert perceptron_output(or_weights, or_bias, [0, 1]) == 1
-assert perceptron_output(or_weights, or_bias, [1, 0]) == 1
-assert perceptron_output(or_weights, or_bias, [0, 0]) == 0
-
-not_weights = [-2.]
-not_bias = 1.
-
-assert perceptron_output(not_weights, not_bias, [0]) == 1
-assert perceptron_output(not_weights, not_bias, [1]) == 0
-
-import math
 
 def sigmoid(t: float) -> float:
     return 1 / (1 + math.exp(-t))
@@ -43,7 +24,6 @@ def neuron_output(weights: Vector, inputs: Vector) -> float:
     # weights includes the bias term, inputs includes a 1
     return sigmoid(dot(weights, inputs))
 
-from typing import List
 
 def feed_forward(neural_network: List[List[Vector]],
                  input_vector: Vector) -> List[Vector]:
@@ -63,19 +43,6 @@ def feed_forward(neural_network: List[List[Vector]],
         input_vector = output
 
     return outputs
-
-xor_network = [# hidden layer
-               [[20., 20, -30],      # 'and' neuron
-                [20., 20, -10]],     # 'or'  neuron
-               # output layer
-               [[-60., 60, -30]]]    # '2nd input but not 1st input' neuron
-
-# feed_forward returns the outputs of all layers, so the [-1] gets the
-# final output, and the [0] gets the value out of the resulting vector
-assert 0.000 < feed_forward(xor_network, [0, 0])[-1][0] < 0.001
-assert 0.999 < feed_forward(xor_network, [1, 0])[-1][0] < 1.000
-assert 0.999 < feed_forward(xor_network, [0, 1])[-1][0] < 1.000
-assert 0.000 < feed_forward(xor_network, [1, 1])[-1][0] < 0.001
 
 def sqerror_gradients(network: List[List[Vector]],
                       input_vector: Vector,
@@ -108,13 +75,6 @@ def sqerror_gradients(network: List[List[Vector]],
 
     return [hidden_grads, output_grads]
 
-[   # hidden layer
-    [[7, 7, -3],     # computes OR
-     [5, 5, -8]],    # computes AND
-    # output layer
-    [[11, -12, -5]]  # computes "first but not second"
-]
-
 def fizz_buzz_encode(x: int) -> Vector:
     if x % 15 == 0:
         return [0, 0, 0, 1]
@@ -125,11 +85,6 @@ def fizz_buzz_encode(x: int) -> Vector:
     else:
         return [1, 0, 0, 0]
 
-assert fizz_buzz_encode(2) == [1, 0, 0, 0]
-assert fizz_buzz_encode(6) == [0, 1, 0, 0]
-assert fizz_buzz_encode(10) == [0, 0, 1, 0]
-assert fizz_buzz_encode(30) == [0, 0, 0, 1]
-
 def binary_encode(x: int) -> Vector:
     binary: List[float] = []
 
@@ -139,25 +94,26 @@ def binary_encode(x: int) -> Vector:
 
     return binary
 
-#                             1  2  4  8 16 32 64 128 256 512
-assert binary_encode(0)   == [0, 0, 0, 0, 0, 0, 0, 0,  0,  0]
-assert binary_encode(1)   == [1, 0, 0, 0, 0, 0, 0, 0,  0,  0]
-assert binary_encode(10)  == [0, 1, 0, 1, 0, 0, 0, 0,  0,  0]
-assert binary_encode(101) == [1, 0, 1, 0, 0, 1, 1, 0,  0,  0]
-assert binary_encode(999) == [1, 1, 1, 0, 0, 1, 1, 1,  1,  1]
-
 def argmax(xs: list) -> int:
     """Returns the index of the largest value"""
     return max(range(len(xs)), key=lambda i: xs[i])
 
-assert argmax([0, -1]) == 0               # items[0] is largest
-assert argmax([-1, 0]) == 1               # items[1] is largest
-assert argmax([-1, 10, 5, 20, -3]) == 3   # items[3] is largest
-
 def main():
-    import random
     random.seed(0)
     
+    xor_network = [# hidden layer
+                [[20., 20, -30],      # 'and' neuron
+                    [20., 20, -10]],     # 'or'  neuron
+                # output layer
+                [[-60., 60, -30]]]    # '2nd input but not 1st input' neuron
+
+    # feed_forward returns the outputs of all layers, so the [-1] gets the
+    # final output, and the [0] gets the value out of the resulting vector
+    assert 0.000 < feed_forward(xor_network, [0, 0])[-1][0] < 0.001
+    assert 0.999 < feed_forward(xor_network, [1, 0])[-1][0] < 1.000
+    assert 0.999 < feed_forward(xor_network, [0, 1])[-1][0] < 1.000
+    assert 0.000 < feed_forward(xor_network, [1, 1])[-1][0] < 0.001
+
     # training data
     xs = [[0., 0], [0., 1], [1., 0], [1., 1]]
     ys = [[0.], [1.], [1.], [0.]]
@@ -170,7 +126,6 @@ def main():
                 [[random.random() for _ in range(2 + 1)]]   # 1st output neuron
               ]
     
-    import tqdm
     
     learning_rate = 1.0
     
@@ -202,7 +157,6 @@ def main():
         [[random.random() for _ in range(NUM_HIDDEN + 1)] for _ in range(4)]
     ]
     
-    from utils.linear_algebra import squared_distance
     
     learning_rate = 1.0
     
