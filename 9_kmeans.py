@@ -1,31 +1,10 @@
-from utils.linear_algebra import Vector
-
-def num_differences(v1: Vector, v2: Vector) -> int:
-    assert len(v1) == len(v2)
-    return len([x1 for x1, x2 in zip(v1, v2) if x1 != x2])
-
-assert num_differences([1, 2, 3], [2, 1, 3]) == 2
-assert num_differences([1, 2], [1, 2]) == 0
-
-from typing import List
-from utils.linear_algebra import vector_mean
-
-def cluster_means(k: int,
-                  inputs: List[Vector],
-                  assignments: List[int]) -> List[Vector]:
-    # clusters[i] contains the inputs whose assignment is i
-    clusters = [[] for i in range(k)]
-    for input, assignment in zip(inputs, assignments):
-        clusters[assignment].append(input)
-
-    # if a cluster is empty, just use a random point
-    return [vector_mean(cluster) if cluster else random.choice(inputs)
-            for cluster in clusters]
-
+from utils.linear_algebra import Vector, vector_mean, squared_distance, distance
+from typing import List, NamedTuple, Union, Tuple, Callable
 import itertools
 import random
 import tqdm
-from utils.linear_algebra import squared_distance
+from matplotlib import pyplot as plt
+
 
 class KMeans:
     def __init__(self, k: int) -> None:
@@ -57,8 +36,6 @@ class KMeans:
                 self.means = cluster_means(self.k, inputs, assignments)
                 t.set_description(f"changed: {num_changed} / {len(inputs)}")
 
-from typing import NamedTuple, Union
-
 class Leaf(NamedTuple):
     value: Vector
 
@@ -68,10 +45,27 @@ leaf2 = Leaf([30, -15])
 class Merged(NamedTuple):
     children: tuple
     order: int
-
+    
 merged = Merged((leaf1, leaf2), order=1)
 
 Cluster = Union[Leaf, Merged]
+    
+def num_differences(v1: Vector, v2: Vector) -> int:
+    assert len(v1) == len(v2)
+    return len([x1 for x1, x2 in zip(v1, v2) if x1 != x2])
+
+def cluster_means(k: int,
+                  inputs: List[Vector],
+                  assignments: List[int]) -> List[Vector]:
+    # clusters[i] contains the inputs whose assignment is i
+    clusters = [[] for i in range(k)]
+    for input, assignment in zip(inputs, assignments):
+        clusters[assignment].append(input)
+
+    # if a cluster is empty, just use a random point
+    return [vector_mean(cluster) if cluster else random.choice(inputs)
+            for cluster in clusters]
+
 
 def get_values(cluster: Cluster) -> List[Vector]:
     if isinstance(cluster, Leaf):
@@ -80,11 +74,6 @@ def get_values(cluster: Cluster) -> List[Vector]:
         return [value
                 for child in cluster.children
                 for value in get_values(child)]
-
-assert get_values(merged) == [[10, 20], [30, -15]]
-
-from typing import Callable
-from utils.linear_algebra import distance
 
 def cluster_distance(cluster1: Cluster,
                      cluster2: Cluster,
@@ -102,8 +91,6 @@ def get_merge_order(cluster: Cluster) -> float:
         return float('inf')  # was never merged
     else:
         return cluster.order
-
-from typing import Tuple
 
 def get_children(cluster: Cluster):
     if isinstance(cluster, Leaf):
@@ -157,9 +144,17 @@ def generate_clusters(base_cluster: Cluster,
     # once we have enough clusters...
     return clusters
 
+def squared_clustering_errors(inputs: List[Vector], k: int) -> float:
+        """finds the total squared error from k-means clustering the inputs"""
+        clusterer = KMeans(k)
+        clusterer.train(inputs)
+        means = clusterer.means
+        assignments = [clusterer.classify(input) for input in inputs]
+    
+        return sum(squared_distance(input, means[cluster])
+                   for input, cluster in zip(inputs, assignments))
+
 def main():
-    
-    
     inputs: List[List[float]] = [[-14,-5],[13,13],[20,23],[-19,-11],[-9,-16],[21,27],[-49,15],[26,13],[-46,5],[-34,-1],[11,15],[-49,0],[-22,-16],[19,28],[-12,-8],[-13,-19],[-41,8],[-11,-6],[-25,-9],[-18,-3]]
     
     random.seed(12)                   # so you get the same results as me
@@ -182,21 +177,7 @@ def main():
     assert len(means) == 2
     assert squared_distance(means[0], [-26, -5]) < 1
     assert squared_distance(means[1], [18, 20]) < 1
-    
-    from matplotlib import pyplot as plt
-    
-    def squared_clustering_errors(inputs: List[Vector], k: int) -> float:
-        """finds the total squared error from k-means clustering the inputs"""
-        clusterer = KMeans(k)
-        clusterer.train(inputs)
-        means = clusterer.means
-        assignments = [clusterer.classify(input) for input in inputs]
-    
-        return sum(squared_distance(input, means[cluster])
-                   for input, cluster in zip(inputs, assignments))
-    
-    # now plot from 1 up to len(inputs) clusters
-    
+
     ks = range(1, len(inputs) + 1)
     errors = [squared_clustering_errors(inputs, k) for k in ks]
     
@@ -205,10 +186,6 @@ def main():
     plt.xlabel("k")
     plt.ylabel("total squared error")
     plt.title("Total Error vs. # of Clusters")
-    # plt.show()
-    
-    
-    
     plt.savefig('im/total_error_vs_num_clusters')
     plt.gca().clear()
     
@@ -228,16 +205,9 @@ def main():
     
     new_img = [[recolor(pixel) for pixel in row]   # recolor this row of pixels
                for row in img]                     # for each row in the image
-    
-    
     plt.close()
-    
     plt.imshow(new_img)
     plt.axis('off')
-    # plt.show()
-    
-    
-    
     plt.savefig('im/recolored_girl_with_book.jpg')
     plt.gca().clear()
     
@@ -245,16 +215,10 @@ def main():
     
     three_clusters = [get_values(cluster)
                       for cluster in generate_clusters(base_cluster, 3)]
-    
-    
-    
-    # sort smallest to largest
     tc = sorted(three_clusters, key=len)
     assert len(tc) == 3
     assert [len(c) for c in tc] == [2, 4, 14]
     assert sorted(tc[0]) == [[11, 15], [13, 13]]
-    
-    
     plt.close()
     
     for i, cluster, marker, color in zip([1, 2, 3],
@@ -271,15 +235,9 @@ def main():
     plt.title("User Locations -- 3 Bottom-Up Clusters, Min")
     plt.xlabel("blocks east of city center")
     plt.ylabel("blocks north of city center")
-    # plt.show()
-    
-    
-    
     plt.savefig('im/bottom_up_clusters_min.png')
     plt.gca().clear()
     plt.close()
-    
-    
     
     base_cluster_max = bottom_up_cluster(inputs, max)
     three_clusters_max = [get_values(cluster)
