@@ -107,7 +107,7 @@ def main():
     assert 19.9 < slope < 20.1,   "slope should be about 20"
     assert 4.9 < intercept < 5.1, "intercept should be about 5"
     
-    # Minibatch gradient descent example
+    # Minibatch gradient descent
     theta = [random.uniform(-1, 1), random.uniform(-1, 1)]
     
     for epoch in range(1000):
