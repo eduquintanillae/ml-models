@@ -3,7 +3,7 @@ from typing import TypeVar, List, Iterator, Callable
 import random
 import matplotlib.pyplot as plt
 
-T = TypeVar('T')  # this allows us to type "generic" functions
+T = TypeVar('T')  # "generic" functions
 
 class GradientDescent:
 
