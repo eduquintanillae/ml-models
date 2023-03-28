@@ -83,7 +83,6 @@ def main():
     plt.legend(loc=9)
     plt.close()
     
-    
     # Using Gradient Descent to Minimize Functions
     v = [random.uniform(-10, 10) for i in range(3)]
     
@@ -93,7 +92,6 @@ def main():
         print(epoch, v)
     
     assert distance(v, [0, 0, 0]) < 0.001
-    
     
     # Using Gradient Descent to Fit Models
     # Start with random values for slope and intercept.
