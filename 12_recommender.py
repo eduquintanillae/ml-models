@@ -1,5 +1,5 @@
-from utils.nlp import cosine_similarity
-from utils.deep_learning import random_tensor
+# from utils.nlp import cosine_similarity
+# from utils.deep_learning import random_tensor
 from typing import Dict, List, Tuple, NamedTuple
 import tqdm
 from utils.linear_algebra import dot
