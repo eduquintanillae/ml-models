@@ -1,5 +1,26 @@
+import re
+import random
+import requests
+import math
+import importlib
+from matplotlib import pyplot as plt
+from bs4 import BeautifulSoup
+from collections import defaultdict
+from typing import List, Dict, Iterable, Tuple
+from utils.linear_algebra import dot, Vector
+from utils.working_with_data import pca, transform
 
-import matplotlib.pyplot as plt
+# deep_learning_module = importlib.import_module('8_deep_learning')
+# DeepLearning = deep_learning_module.DeepLearning()
+
+from utils.deep_learning import Tensor
+from utils.deep_learning import Layer, Tensor, random_tensor, zeros_like
+from utils.deep_learning import tensor_apply, tanh
+from utils.deep_learning import SoftmaxCrossEntropy, Momentum, GradientDescent
+from utils.deep_learning import Tensor, one_hot_encode
+from utils.deep_learning import Sequential, Linear
+from utils.deep_learning import softmax
+
 plt.gca().clear()
 
 data = [ ("big data", 100, 15), ("Hadoop", 95, 25), ("Python", 75, 50),
@@ -10,15 +31,8 @@ data = [ ("big data", 100, 15), ("Hadoop", 95, 25), ("Python", 75, 50),
          ("self-starter", 30, 50), ("customer focus", 65, 15),
          ("thought leadership", 35, 35)]
 
-
-from matplotlib import pyplot as plt
-
 def fix_unicode(text: str) -> str:
     return text.replace(u"\u2019", "'")
-
-import re
-from bs4 import BeautifulSoup
-import requests
 
 url = "https://www.oreilly.com/ideas/what-is-data-science"
 html = requests.get(url).text
@@ -33,7 +47,6 @@ for paragraph in content("p"):
     words = re.findall(regex, fix_unicode(paragraph.text))
     document.extend(words)
 
-from collections import defaultdict
 
 transitions = defaultdict(list)
 for prev, current in zip(document, document[1:]):
@@ -72,7 +85,6 @@ def generate_using_trigrams() -> str:
         if current == ".":
             return " ".join(result)
 
-from typing import List, Dict
 
 # Type alias to refer to grammars later
 Grammar = Dict[str, List[str]]
@@ -116,9 +128,6 @@ def expand(grammar: Grammar, tokens: List[str]) -> List[str]:
 
 def generate_sentence(grammar: Grammar) -> List[str]:
     return expand(grammar, ["_S"])
-
-from typing import Tuple
-import random
 
 def roll_a_die() -> int:
     return random.choice([1, 2, 3, 4, 5, 6])
@@ -288,8 +297,6 @@ for document, topic_counts in zip(documents, document_topic_counts):
             print(topic_names[topic], count)
     print()
 
-from scratch.linear_algebra import dot, Vector
-import math
 
 def cosine_similarity(v1: Vector, v2: Vector) -> float:
     return dot(v1, v2) / math.sqrt(dot(v1, v1) * dot(v2, v2))
@@ -319,8 +326,6 @@ NUM_SENTENCES = 50
 
 random.seed(0)
 sentences = [make_sentence() for _ in range(NUM_SENTENCES)]
-
-from scratch.deep_learning import Tensor
 
 class Vocabulary:
     def __init__(self, words: List[str] = None) -> None:
@@ -379,9 +384,6 @@ def load_vocab(filename: str) -> Vocabulary:
         vocab.w2i = json.load(f)
         vocab.i2w = {id: word for word, id in vocab.w2i.items()}
     return vocab
-
-from typing import Iterable
-from scratch.deep_learning import Layer, Tensor, random_tensor, zeros_like
 
 class Embedding(Layer):
     def __init__(self, num_embeddings: int, embedding_dim: int) -> None:
@@ -443,7 +445,6 @@ class TextEmbedding(Embedding):
 
         return scores[:n]
 
-from scratch.deep_learning import tensor_apply, tanh
 
 class SimpleRnn(Layer):
     """Just about the simplest possible recurrent layer."""
@@ -523,8 +524,7 @@ def main():
     
     
     plt.close()
-    
-    import re
+
     
     # This is not a great regex, but it works on our data.
     tokenized_sentences = [re.findall("[a-z]+|[.]", sentence.lower())
@@ -535,7 +535,6 @@ def main():
                        for sentence_words in tokenized_sentences
                        for word in sentence_words)
     
-    from scratch.deep_learning import Tensor, one_hot_encode
     
     inputs: List[int] = []
     targets: List[Tensor] = []
@@ -555,7 +554,6 @@ def main():
     
     # Model for learning word vectors
     
-    from scratch.deep_learning import Sequential, Linear
     
     random.seed(0)
     EMBEDDING_DIM = 5  # seems like a good size
@@ -573,7 +571,6 @@ def main():
     
     # Train the word vector model
     
-    from scratch.deep_learning import SoftmaxCrossEntropy, Momentum, GradientDescent
     
     loss = SoftmaxCrossEntropy()
     optimizer = GradientDescent(learning_rate=0.01)
@@ -606,9 +603,6 @@ def main():
     # Plot word vectors
     plt.close()
     
-    from scratch.working_with_data import pca, transform
-    import matplotlib.pyplot as plt
-    
     # Extract the first two principal components and transform the word vectors
     components = pca(embedding.embeddings, 2)
     transformed = transform(embedding.embeddings, components)
@@ -633,8 +627,6 @@ def main():
     plt.gca().clear()
     plt.close()
     
-    from bs4 import BeautifulSoup
-    import requests
     
     url = "https://www.ycombinator.com/topcompanies/"
     soup = BeautifulSoup(requests.get(url).text, 'html5lib')
@@ -666,7 +658,6 @@ def main():
         linear
     ])
     
-    from scratch.deep_learning import softmax
     
     def generate(seed: str = START, max_len: int = 50) -> str:
         rnn1.reset_hidden_state()  # Reset both hidden states.
