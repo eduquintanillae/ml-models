@@ -2,10 +2,11 @@ import re
 import random
 import requests
 import math
-import importlib
+import tqdm
+import json
 from matplotlib import pyplot as plt
 from bs4 import BeautifulSoup
-from collections import defaultdict
+from collections import defaultdict, Counter
 from typing import List, Dict, Iterable, Tuple
 from utils.linear_algebra import dot, Vector
 from utils.working_with_data import pca, transform
@@ -23,34 +24,8 @@ from utils.deep_learning import softmax
 
 plt.gca().clear()
 
-data = [ ("big data", 100, 15), ("Hadoop", 95, 25), ("Python", 75, 50),
-         ("R", 50, 40), ("machine learning", 80, 20), ("statistics", 20, 60),
-         ("data science", 60, 70), ("analytics", 90, 3),
-         ("team player", 85, 85), ("dynamic", 2, 90), ("synergies", 70, 0),
-         ("actionable insights", 40, 30), ("think out of the box", 45, 10),
-         ("self-starter", 30, 50), ("customer focus", 65, 15),
-         ("thought leadership", 35, 35)]
-
 def fix_unicode(text: str) -> str:
     return text.replace(u"\u2019", "'")
-
-url = "https://www.oreilly.com/ideas/what-is-data-science"
-html = requests.get(url).text
-soup = BeautifulSoup(html, 'html5lib')
-
-content = soup.find("div", "article-body")   # find article-body div
-regex = r"[\w']+|[\.]"                       # matches a word or a period
-
-document = []
-
-for paragraph in content("p"):
-    words = re.findall(regex, fix_unicode(paragraph.text))
-    document.extend(words)
-
-
-transitions = defaultdict(list)
-for prev, current in zip(document, document[1:]):
-    transitions[prev].append(current)
 
 def generate_using_bigrams() -> str:
     current = "."   # this means the next word will start a sentence
@@ -60,16 +35,6 @@ def generate_using_bigrams() -> str:
         current = random.choice(next_word_candidates)  # choose one at random
         result.append(current)                         # append it to results
         if current == ".": return " ".join(result)     # if "." we're done
-
-trigram_transitions = defaultdict(list)
-starts = []
-
-for prev, current, next in zip(document, document[1:], document[2:]):
-
-    if prev == ".":              # if the previous "word" was a period
-        starts.append(current)   # then this is a start word
-
-    trigram_transitions[(prev, current)].append(next)
 
 def generate_using_trigrams() -> str:
     current = random.choice(starts)   # choose a random starting word
@@ -85,21 +50,6 @@ def generate_using_trigrams() -> str:
         if current == ".":
             return " ".join(result)
 
-
-# Type alias to refer to grammars later
-Grammar = Dict[str, List[str]]
-
-grammar = {
-    "_S"  : ["_NP _VP"],
-    "_NP" : ["_N",
-             "_A _NP _P _A _N"],
-    "_VP" : ["_V",
-             "_V _NP"],
-    "_N"  : ["data science", "Python", "regression"],
-    "_A"  : ["big", "linear", "logistic"],
-    "_P"  : ["about", "near"],
-    "_V"  : ["learns", "trains", "tests", "is"]
-}
 
 def is_terminal(token: str) -> bool:
     return token[0] != "_"
@@ -168,57 +118,11 @@ def compare_distributions(num_samples: int = 1000) -> Dict[int, List[int]]:
 def sample_from(weights: List[float]) -> int:
     """returns i with probability weights[i] / sum(weights)"""
     total = sum(weights)
-    rnd = total * random.random()      # uniform between 0 and total
+    rnd = total * random.random()
     for i, w in enumerate(weights):
-        rnd -= w                       # return the smallest i such that
-        if rnd <= 0: return i          # weights[0] + ... + weights[i] >= rnd
-
-from collections import Counter
-
-# Draw 1000 times and count
-draws = Counter(sample_from([0.1, 0.1, 0.8]) for _ in range(1000))
-assert 10 < draws[0] < 190   # should be ~10%, this is a really loose test
-assert 10 < draws[1] < 190   # should be ~10%, this is a really loose test
-assert 650 < draws[2] < 950  # should be ~80%, this is a really loose test
-assert draws[0] + draws[1] + draws[2] == 1000
-
-documents = [
-    ["Hadoop", "Big Data", "HBase", "Java", "Spark", "Storm", "Cassandra"],
-    ["NoSQL", "MongoDB", "Cassandra", "HBase", "Postgres"],
-    ["Python", "scikit-learn", "scipy", "numpy", "statsmodels", "pandas"],
-    ["R", "Python", "statistics", "regression", "probability"],
-    ["machine learning", "regression", "decision trees", "libsvm"],
-    ["Python", "R", "Java", "C++", "Haskell", "programming languages"],
-    ["statistics", "probability", "mathematics", "theory"],
-    ["machine learning", "scikit-learn", "Mahout", "neural networks"],
-    ["neural networks", "deep learning", "Big Data", "artificial intelligence"],
-    ["Hadoop", "Java", "MapReduce", "Big Data"],
-    ["statistics", "R", "statsmodels"],
-    ["C++", "deep learning", "artificial intelligence", "probability"],
-    ["pandas", "R", "Python"],
-    ["databases", "HBase", "Postgres", "MySQL", "MongoDB"],
-    ["libsvm", "regression", "support vector machines"]
-]
-
-K = 4
-
-# a list of Counters, one for each document
-document_topic_counts = [Counter() for _ in documents]
-
-# a list of Counters, one for each topic
-topic_word_counts = [Counter() for _ in range(K)]
-
-# a list of numbers, one for each topic
-topic_counts = [0 for _ in range(K)]
-
-# a list of numbers, one for each document
-document_lengths = [len(document) for document in documents]
-
-distinct_words = set(word for document in documents for word in document)
-W = len(distinct_words)
-
-D = len(documents)
-
+        rnd -= w
+        if rnd <= 0: return i
+        
 def p_topic_given_document(topic: int, d: int, alpha: float = 0.1) -> float:
     """
     The fraction of words in document _d_
@@ -245,71 +149,9 @@ def topic_weight(d: int, word: str, k: int) -> float:
 def choose_new_topic(d: int, word: str) -> int:
     return sample_from([topic_weight(d, word, k)
                         for k in range(K)])
-
-random.seed(0)
-document_topics = [[random.randrange(K) for word in document]
-                   for document in documents]
-
-for d in range(D):
-    for word, topic in zip(documents[d], document_topics[d]):
-        document_topic_counts[d][topic] += 1
-        topic_word_counts[topic][word] += 1
-        topic_counts[topic] += 1
-
-import tqdm
-
-for iter in tqdm.trange(1000):
-    for d in range(D):
-        for i, (word, topic) in enumerate(zip(documents[d],
-                                              document_topics[d])):
-
-            # remove this word / topic from the counts
-            # so that it doesn't influence the weights
-            document_topic_counts[d][topic] -= 1
-            topic_word_counts[topic][word] -= 1
-            topic_counts[topic] -= 1
-            document_lengths[d] -= 1
-
-            # choose a new topic based on the weights
-            new_topic = choose_new_topic(d, word)
-            document_topics[d][i] = new_topic
-
-            # and now add it back to the counts
-            document_topic_counts[d][new_topic] += 1
-            topic_word_counts[new_topic][word] += 1
-            topic_counts[new_topic] += 1
-            document_lengths[d] += 1
-
-for k, word_counts in enumerate(topic_word_counts):
-    for word, count in word_counts.most_common():
-        if count > 0:
-            print(k, word, count)
-
-topic_names = ["Big Data and programming languages",
-               "Python and statistics",
-               "databases",
-               "machine learning"]
-
-for document, topic_counts in zip(documents, document_topic_counts):
-    print(document)
-    for topic, count in topic_counts.most_common():
-        if count > 0:
-            print(topic_names[topic], count)
-    print()
-
-
+    
 def cosine_similarity(v1: Vector, v2: Vector) -> float:
     return dot(v1, v2) / math.sqrt(dot(v1, v1) * dot(v2, v2))
-
-assert cosine_similarity([1., 1, 1], [2., 2, 2]) == 1, "same direction"
-assert cosine_similarity([-1., -1], [2., 2]) == -1,    "opposite direction"
-assert cosine_similarity([1., 0], [0., 1]) == 0,       "orthogonal"
-
-colors = ["red", "green", "blue", "yellow", "black", ""]
-nouns = ["bed", "car", "boat", "cat"]
-verbs = ["is", "was", "seems"]
-adverbs = ["very", "quite", "extremely", ""]
-adjectives = ["slow", "fast", "soft", "hard"]
 
 def make_sentence() -> str:
     return " ".join([
@@ -321,11 +163,18 @@ def make_sentence() -> str:
         random.choice(adjectives),
         "."
     ])
+    
+def save_vocab(vocab: Vocabulary, filename: str) -> None:
+    with open(filename, 'w') as f:
+        json.dump(vocab.w2i, f)       # Only need to save w2i
 
-NUM_SENTENCES = 50
-
-random.seed(0)
-sentences = [make_sentence() for _ in range(NUM_SENTENCES)]
+def load_vocab(filename: str) -> Vocabulary:
+    vocab = Vocabulary()
+    with open(filename) as f:
+        # Load w2i and generate i2w from it.
+        vocab.w2i = json.load(f)
+        vocab.i2w = {id: word for word, id in vocab.w2i.items()}
+    return vocab
 
 class Vocabulary:
     def __init__(self, words: List[str] = None) -> None:
@@ -359,32 +208,7 @@ class Vocabulary:
         assert word_id is not None, f"unknown word {word}"
 
         return [1.0 if i == word_id else 0.0 for i in range(self.size)]
-
-vocab = Vocabulary(["a", "b", "c"])
-assert vocab.size == 3,              "there are 3 words in the vocab"
-assert vocab.get_id("b") == 1,       "b should have word_id 1"
-assert vocab.one_hot_encode("b") == [0, 1, 0]
-assert vocab.get_id("z") is None,    "z is not in the vocab"
-assert vocab.get_word(2) == "c",     "word_id 2 should be c"
-vocab.add("z")
-assert vocab.size == 4,              "now there are 4 words in the vocab"
-assert vocab.get_id("z") == 3,       "now z should have id 3"
-assert vocab.one_hot_encode("z") == [0, 0, 0, 1]
-
-import json
-
-def save_vocab(vocab: Vocabulary, filename: str) -> None:
-    with open(filename, 'w') as f:
-        json.dump(vocab.w2i, f)       # Only need to save w2i
-
-def load_vocab(filename: str) -> Vocabulary:
-    vocab = Vocabulary()
-    with open(filename) as f:
-        # Load w2i and generate i2w from it.
-        vocab.w2i = json.load(f)
-        vocab.i2w = {id: word for word, id in vocab.w2i.items()}
-    return vocab
-
+    
 class Embedding(Layer):
     def __init__(self, num_embeddings: int, embedding_dim: int) -> None:
         self.num_embeddings = num_embeddings
@@ -505,8 +329,139 @@ class SimpleRnn(Layer):
         return [self.w_grad, self.u_grad, self.b_grad]
 
 def main():
-    from matplotlib import pyplot as plt
-    
+
+    random.seed(0)
+    data = [ ("big data", 100, 15), ("Hadoop", 95, 25), ("Python", 75, 50),
+            ("R", 50, 40), ("machine learning", 80, 20), ("statistics", 20, 60),
+            ("data science", 60, 70), ("analytics", 90, 3),
+            ("team player", 85, 85), ("dynamic", 2, 90), ("synergies", 70, 0),
+            ("actionable insights", 40, 30), ("think out of the box", 45, 10),
+            ("self-starter", 30, 50), ("customer focus", 65, 15),
+            ("thought leadership", 35, 35)]
+
+    url = "https://www.oreilly.com/ideas/what-is-data-science"
+    html = requests.get(url).text
+    soup = BeautifulSoup(html, 'html5lib')
+    content = soup.find("div", "article-body") 
+    regex = r"[\w']+|[\.]"
+    document = []
+
+    for paragraph in content("p"):
+        words = re.findall(regex, fix_unicode(paragraph.text))
+        document.extend(words)
+
+    transitions = defaultdict(list)
+    for prev, current in zip(document, document[1:]):
+        transitions[prev].append(current)
+
+
+    trigram_transitions = defaultdict(list)
+    starts = []
+
+    for prev, current, next in zip(document, document[1:], document[2:]):
+
+        if prev == ".":
+            starts.append(current)
+
+        trigram_transitions[(prev, current)].append(next)
+
+    Grammar = Dict[str, List[str]]
+
+    grammar = {
+        "_S"  : ["_NP _VP"],
+        "_NP" : ["_N",
+                "_A _NP _P _A _N"],
+        "_VP" : ["_V",
+                "_V _NP"],
+        "_N"  : ["data science", "Python", "regression"],
+        "_A"  : ["big", "linear", "logistic"],
+        "_P"  : ["about", "near"],
+        "_V"  : ["learns", "trains", "tests", "is"]
+    }
+
+    documents = [
+        ["Hadoop", "Big Data", "HBase", "Java", "Spark", "Storm", "Cassandra"],
+        ["NoSQL", "MongoDB", "Cassandra", "HBase", "Postgres"],
+        ["Python", "scikit-learn", "scipy", "numpy", "statsmodels", "pandas"],
+        ["R", "Python", "statistics", "regression", "probability"],
+        ["machine learning", "regression", "decision trees", "libsvm"],
+        ["Python", "R", "Java", "C++", "Haskell", "programming languages"],
+        ["statistics", "probability", "mathematics", "theory"],
+        ["machine learning", "scikit-learn", "Mahout", "neural networks"],
+        ["neural networks", "deep learning", "Big Data", "artificial intelligence"],
+        ["Hadoop", "Java", "MapReduce", "Big Data"],
+        ["statistics", "R", "statsmodels"],
+        ["C++", "deep learning", "artificial intelligence", "probability"],
+        ["pandas", "R", "Python"],
+        ["databases", "HBase", "Postgres", "MySQL", "MongoDB"],
+        ["libsvm", "regression", "support vector machines"]
+    ]
+
+    K = 4
+    document_topic_counts = [Counter() for _ in documents]
+    topic_word_counts = [Counter() for _ in range(K)]
+    topic_counts = [0 for _ in range(K)]
+    document_lengths = [len(document) for document in documents]
+    distinct_words = set(word for document in documents for word in document)
+    W = len(distinct_words)
+    D = len(documents)
+
+    random.seed(0)
+    document_topics = [[random.randrange(K) for word in document]
+                    for document in documents]
+
+    for d in range(D):
+        for word, topic in zip(documents[d], document_topics[d]):
+            document_topic_counts[d][topic] += 1
+            topic_word_counts[topic][word] += 1
+            topic_counts[topic] += 1
+
+
+    for iter in tqdm.trange(1000):
+        for d in range(D):
+            for i, (word, topic) in enumerate(zip(documents[d],
+                                                document_topics[d])):
+                document_topic_counts[d][topic] -= 1
+                topic_word_counts[topic][word] -= 1
+                topic_counts[topic] -= 1
+                document_lengths[d] -= 1
+
+                new_topic = choose_new_topic(d, word)
+                document_topics[d][i] = new_topic
+
+                document_topic_counts[d][new_topic] += 1
+                topic_word_counts[new_topic][word] += 1
+                topic_counts[new_topic] += 1
+                document_lengths[d] += 1
+
+    for k, word_counts in enumerate(topic_word_counts):
+        for word, count in word_counts.most_common():
+            if count > 0:
+                print(k, word, count)
+
+    topic_names = ["Big Data and programming languages",
+                "Python and statistics",
+                "databases",
+                "machine learning"]
+
+    for document, topic_counts in zip(documents, document_topic_counts):
+        print(document)
+        for topic, count in topic_counts.most_common():
+            if count > 0:
+                print(topic_names[topic], count)
+        print()
+
+    colors = ["red", "green", "blue", "yellow", "black", ""]
+    nouns = ["bed", "car", "boat", "cat"]
+    verbs = ["is", "was", "seems"]
+    adverbs = ["very", "quite", "extremely", ""]
+    adjectives = ["slow", "fast", "soft", "hard"]
+    NUM_SENTENCES = 50
+    sentences = [make_sentence() for _ in range(NUM_SENTENCES)]
+
+
+    vocab = Vocabulary(["a", "b", "c"])
+    vocab.add("z")    
     def text_size(total: int) -> float:
         """equals 8 if total is 0, 28 if total is 200"""
         return 8 + total / 200 * 20
@@ -520,17 +475,10 @@ def main():
     plt.axis([0, 100, 0, 100])
     plt.xticks([])
     plt.yticks([])
-    # plt.show()
-    
-    
     plt.close()
 
-    
-    # This is not a great regex, but it works on our data.
     tokenized_sentences = [re.findall("[a-z]+|[.]", sentence.lower())
                            for sentence in sentences]
-    
-    # Create a vocabulary (that is, a mapping word -> word_id) based on our text.
     vocab = Vocabulary(word
                        for sentence_words in tokenized_sentences
                        for word in sentence_words)
@@ -540,38 +488,21 @@ def main():
     targets: List[Tensor] = []
     
     for sentence in tokenized_sentences:
-        for i, word in enumerate(sentence):          # For each word
-            for j in [i - 2, i - 1, i + 1, i + 2]:   # take the nearby locations
-                if 0 <= j < len(sentence):           # that aren't out of bounds
-                    nearby_word = sentence[j]        # and get those words.
-    
-                    # Add an input that's the original word_id
+        for i, word in enumerate(sentence):
+            for j in [i - 2, i - 1, i + 1, i + 2]:
+                if 0 <= j < len(sentence):
+                    nearby_word = sentence[j]
                     inputs.append(vocab.get_id(word))
-    
-                    # Add a target that's the one-hot-encoded nearby word
-                    targets.append(vocab.one_hot_encode(nearby_word))
-    
-    
-    # Model for learning word vectors
-    
+                    targets.append(vocab.one_hot_encode(nearby_word))    
     
     random.seed(0)
-    EMBEDDING_DIM = 5  # seems like a good size
-    
-    # Define the embedding layer separately, so we can reference it.
+    EMBEDDING_DIM = 5
     embedding = TextEmbedding(vocab=vocab, embedding_dim=EMBEDDING_DIM)
     
     model = Sequential([
-        # Given a word (as a vector of word_ids), look up its embedding.
         embedding,
-        # And use a linear layer to compute scores for "nearby words".
         Linear(input_dim=EMBEDDING_DIM, output_dim=vocab.size)
     ])
-    
-    
-    # Train the word vector model
-    
-    
     loss = SoftmaxCrossEntropy()
     optimizer = GradientDescent(learning_rate=0.01)
     
@@ -583,14 +514,10 @@ def main():
             gradient = loss.gradient(predicted, target)
             model.backward(gradient)
             optimizer.step(model)
-        print(epoch, epoch_loss)            # Print the loss
-        print(embedding.closest("black"))   # and also a few nearest words
-        print(embedding.closest("slow"))    # so we can see what's being
-        print(embedding.closest("car"))     # learned.
-    
-    
-    
-    # Explore most similar words
+        print(epoch, epoch_loss)
+        print(embedding.closest("black"))
+        print(embedding.closest("slow"))
+        print(embedding.closest("car"))
     
     pairs = [(cosine_similarity(embedding[w1], embedding[w2]), w1, w2)
              for w1 in vocab.w2i
@@ -598,40 +525,23 @@ def main():
              if w1 < w2]
     pairs.sort(reverse=True)
     print(pairs[:5])
-    
-    
-    # Plot word vectors
     plt.close()
     
-    # Extract the first two principal components and transform the word vectors
     components = pca(embedding.embeddings, 2)
     transformed = transform(embedding.embeddings, components)
-    
-    # Scatter the points (and make them white so they're "invisible")
     fig, ax = plt.subplots()
     ax.scatter(*zip(*transformed), marker='.', color='w')
     
-    # Add annotations for each word at its transformed location
     for word, idx in vocab.w2i.items():
         ax.annotate(word, transformed[idx])
-    
-    # And hide the axes
     ax.get_xaxis().set_visible(False)
     ax.get_yaxis().set_visible(False)
-    
-    # plt.show()
-    
-    
-    
     plt.savefig('im/word_vectors')
     plt.gca().clear()
     plt.close()
     
-    
     url = "https://www.ycombinator.com/topcompanies/"
     soup = BeautifulSoup(requests.get(url).text, 'html5lib')
-    
-    # We get the companies twice, so use a set comprehension to deduplicate.
     companies = list({b.text
                       for b in soup("b")
                       if "h4" in b.get("class", ())})
@@ -641,12 +551,9 @@ def main():
     
     START = "^"
     STOP = "$"
-    
-    # We need to add them to the vocabulary too.
     vocab.add(START)
     vocab.add(STOP)
-    
-    HIDDEN_DIM = 32  # You should experiment with different sizes!
+    HIDDEN_DIM = 32
     
     rnn1 =  SimpleRnn(input_dim=vocab.size, hidden_dim=HIDDEN_DIM)
     rnn2 =  SimpleRnn(input_dim=HIDDEN_DIM, hidden_dim=HIDDEN_DIM)
@@ -658,43 +565,31 @@ def main():
         linear
     ])
     
-    
     def generate(seed: str = START, max_len: int = 50) -> str:
-        rnn1.reset_hidden_state()  # Reset both hidden states.
+        rnn1.reset_hidden_state()
         rnn2.reset_hidden_state()
-        output = [seed]            # Start the output with the specified seed.
-    
-        # Keep going until we produce the STOP character or reach the max length
+        output = [seed]
+        
         while output[-1] != STOP and len(output) < max_len:
-            # Use the last character as the input
             input = vocab.one_hot_encode(output[-1])
-    
-            # Generate scores using the model
             predicted = model.forward(input)
-    
-            # Convert them to probabilities and draw a random char_id
             probabilities = softmax(predicted)
             next_char_id = sample_from(probabilities)
-    
-            # Add the corresponding char to our output
             output.append(vocab.get_word(next_char_id))
-    
-        # Get rid of START and END characters and return the word.
+            
         return ''.join(output[1:-1])
     
     loss = SoftmaxCrossEntropy()
     optimizer = Momentum(learning_rate=0.01, momentum=0.9)
     
     for epoch in range(300):
-        random.shuffle(companies)  # Train in a different order each epoch.
-        epoch_loss = 0             # Track the loss.
+        random.shuffle(companies)
+        epoch_loss = 0
         for company in tqdm.tqdm(companies):
-            rnn1.reset_hidden_state()  # Reset both hidden states.
+            rnn1.reset_hidden_state()
             rnn2.reset_hidden_state()
-            company = START + company + STOP   # Add START and STOP characters.
-    
-            # The rest is just our usual training loop, except that the inputs
-            # and target are the one-hot-encoded previous and next characters.
+            company = START + company + STOP
+            
             for prev, next in zip(company, company[1:]):
                 input = vocab.one_hot_encode(prev)
                 target = vocab.one_hot_encode(next)
@@ -703,13 +598,10 @@ def main():
                 gradient = loss.gradient(predicted, target)
                 model.backward(gradient)
                 optimizer.step(model)
-    
-        # Each epoch print the loss and also generate a name
         print(epoch, epoch_loss, generate())
-    
-        # Turn down the learning rate for the last 100 epochs.
-        # There's no principled reason for this, but it seems to work.
+        
         if epoch == 200:
             optimizer.lr *= 0.1
     
-if __name__ == "__main__": main()
+if __name__ == "__main__": 
+    main()
