@@ -27,6 +27,137 @@ plt.gca().clear()
 def fix_unicode(text: str) -> str:
     return text.replace(u"\u2019", "'")
 
+def choose_new_topic(d: int, word: str) -> int:
+    return sample_from([topic_weight(d, word, k)
+                        for k in range(K)])
+    
+data = [ ("big data", 100, 15), ("Hadoop", 95, 25), ("Python", 75, 50),
+        ("R", 50, 40), ("machine learning", 80, 20), ("statistics", 20, 60),
+        ("data science", 60, 70), ("analytics", 90, 3),
+        ("team player", 85, 85), ("dynamic", 2, 90), ("synergies", 70, 0),
+        ("actionable insights", 40, 30), ("think out of the box", 45, 10),
+        ("self-starter", 30, 50), ("customer focus", 65, 15),
+        ("thought leadership", 35, 35)]
+
+url = "https://www.oreilly.com/ideas/what-is-data-science"
+html = requests.get(url).text
+soup = BeautifulSoup(html, 'html5lib')
+content = soup.find("div", "article-body") 
+regex = r"[\w']+|[\.]"
+document = []
+
+for paragraph in content("p"):
+    words = re.findall(regex, fix_unicode(paragraph.text))
+    document.extend(words)
+
+transitions = defaultdict(list)
+for prev, current in zip(document, document[1:]):
+    transitions[prev].append(current)
+
+
+trigram_transitions = defaultdict(list)
+starts = []
+
+for prev, current, next in zip(document, document[1:], document[2:]):
+
+    if prev == ".":
+        starts.append(current)
+
+    trigram_transitions[(prev, current)].append(next)
+
+Grammar = Dict[str, List[str]]
+
+grammar = {
+    "_S"  : ["_NP _VP"],
+    "_NP" : ["_N",
+            "_A _NP _P _A _N"],
+    "_VP" : ["_V",
+            "_V _NP"],
+    "_N"  : ["data science", "Python", "regression"],
+    "_A"  : ["big", "linear", "logistic"],
+    "_P"  : ["about", "near"],
+    "_V"  : ["learns", "trains", "tests", "is"]
+}
+
+documents = [
+    ["Hadoop", "Big Data", "HBase", "Java", "Spark", "Storm", "Cassandra"],
+    ["NoSQL", "MongoDB", "Cassandra", "HBase", "Postgres"],
+    ["Python", "scikit-learn", "scipy", "numpy", "statsmodels", "pandas"],
+    ["R", "Python", "statistics", "regression", "probability"],
+    ["machine learning", "regression", "decision trees", "libsvm"],
+    ["Python", "R", "Java", "C++", "Haskell", "programming languages"],
+    ["statistics", "probability", "mathematics", "theory"],
+    ["machine learning", "scikit-learn", "Mahout", "neural networks"],
+    ["neural networks", "deep learning", "Big Data", "artificial intelligence"],
+    ["Hadoop", "Java", "MapReduce", "Big Data"],
+    ["statistics", "R", "statsmodels"],
+    ["C++", "deep learning", "artificial intelligence", "probability"],
+    ["pandas", "R", "Python"],
+    ["databases", "HBase", "Postgres", "MySQL", "MongoDB"],
+    ["libsvm", "regression", "support vector machines"]
+]
+
+K = 4
+document_topic_counts = [Counter() for _ in documents]
+topic_word_counts = [Counter() for _ in range(K)]
+topic_counts = [0 for _ in range(K)]
+document_lengths = [len(document) for document in documents]
+distinct_words = set(word for document in documents for word in document)
+W = len(distinct_words)
+D = len(documents)
+
+random.seed(0)
+document_topics = [[random.randrange(K) for word in document]
+                for document in documents]
+
+for d in range(D):
+    for word, topic in zip(documents[d], document_topics[d]):
+        document_topic_counts[d][topic] += 1
+        topic_word_counts[topic][word] += 1
+        topic_counts[topic] += 1
+
+
+for iter in tqdm.trange(1000):
+    for d in range(D):
+        for i, (word, topic) in enumerate(zip(documents[d],
+                                            document_topics[d])):
+            document_topic_counts[d][topic] -= 1
+            topic_word_counts[topic][word] -= 1
+            topic_counts[topic] -= 1
+            document_lengths[d] -= 1
+
+            new_topic = choose_new_topic(d, word)
+            document_topics[d][i] = new_topic
+
+            document_topic_counts[d][new_topic] += 1
+            topic_word_counts[new_topic][word] += 1
+            topic_counts[new_topic] += 1
+            document_lengths[d] += 1
+
+for k, word_counts in enumerate(topic_word_counts):
+    for word, count in word_counts.most_common():
+        if count > 0:
+            print(k, word, count)
+
+topic_names = ["Big Data and programming languages",
+            "Python and statistics",
+            "databases",
+            "machine learning"]
+
+for document, topic_counts in zip(documents, document_topic_counts):
+    print(document)
+    for topic, count in topic_counts.most_common():
+        if count > 0:
+            print(topic_names[topic], count)
+    print()
+
+colors = ["red", "green", "blue", "yellow", "black", ""]
+nouns = ["bed", "car", "boat", "cat"]
+verbs = ["is", "was", "seems"]
+adverbs = ["very", "quite", "extremely", ""]
+adjectives = ["slow", "fast", "soft", "hard"]
+
+
 def generate_using_bigrams() -> str:
     current = "."   # this means the next word will start a sentence
     result = []
@@ -145,10 +276,6 @@ def topic_weight(d: int, word: str, k: int) -> float:
     return the weight for the kth topic
     """
     return p_word_given_topic(word, k) * p_topic_given_document(k, d)
-
-def choose_new_topic(d: int, word: str) -> int:
-    return sample_from([topic_weight(d, word, k)
-                        for k in range(K)])
     
 def cosine_similarity(v1: Vector, v2: Vector) -> float:
     return dot(v1, v2) / math.sqrt(dot(v1, v1) * dot(v2, v2))
@@ -163,18 +290,6 @@ def make_sentence() -> str:
         random.choice(adjectives),
         "."
     ])
-    
-def save_vocab(vocab: Vocabulary, filename: str) -> None:
-    with open(filename, 'w') as f:
-        json.dump(vocab.w2i, f)       # Only need to save w2i
-
-def load_vocab(filename: str) -> Vocabulary:
-    vocab = Vocabulary()
-    with open(filename) as f:
-        # Load w2i and generate i2w from it.
-        vocab.w2i = json.load(f)
-        vocab.i2w = {id: word for word, id in vocab.w2i.items()}
-    return vocab
 
 class Vocabulary:
     def __init__(self, words: List[str] = None) -> None:
@@ -209,6 +324,18 @@ class Vocabulary:
 
         return [1.0 if i == word_id else 0.0 for i in range(self.size)]
     
+def save_vocab(vocab: Vocabulary, filename: str) -> None:
+    with open(filename, 'w') as f:
+        json.dump(vocab.w2i, f)       # Only need to save w2i
+
+def load_vocab(filename: str) -> Vocabulary:
+    vocab = Vocabulary()
+    with open(filename) as f:
+        # Load w2i and generate i2w from it.
+        vocab.w2i = json.load(f)
+        vocab.i2w = {id: word for word, id in vocab.w2i.items()}
+    return vocab
+
 class Embedding(Layer):
     def __init__(self, num_embeddings: int, embedding_dim: int) -> None:
         self.num_embeddings = num_embeddings
@@ -331,131 +458,6 @@ class SimpleRnn(Layer):
 def main():
 
     random.seed(0)
-    data = [ ("big data", 100, 15), ("Hadoop", 95, 25), ("Python", 75, 50),
-            ("R", 50, 40), ("machine learning", 80, 20), ("statistics", 20, 60),
-            ("data science", 60, 70), ("analytics", 90, 3),
-            ("team player", 85, 85), ("dynamic", 2, 90), ("synergies", 70, 0),
-            ("actionable insights", 40, 30), ("think out of the box", 45, 10),
-            ("self-starter", 30, 50), ("customer focus", 65, 15),
-            ("thought leadership", 35, 35)]
-
-    url = "https://www.oreilly.com/ideas/what-is-data-science"
-    html = requests.get(url).text
-    soup = BeautifulSoup(html, 'html5lib')
-    content = soup.find("div", "article-body") 
-    regex = r"[\w']+|[\.]"
-    document = []
-
-    for paragraph in content("p"):
-        words = re.findall(regex, fix_unicode(paragraph.text))
-        document.extend(words)
-
-    transitions = defaultdict(list)
-    for prev, current in zip(document, document[1:]):
-        transitions[prev].append(current)
-
-
-    trigram_transitions = defaultdict(list)
-    starts = []
-
-    for prev, current, next in zip(document, document[1:], document[2:]):
-
-        if prev == ".":
-            starts.append(current)
-
-        trigram_transitions[(prev, current)].append(next)
-
-    Grammar = Dict[str, List[str]]
-
-    grammar = {
-        "_S"  : ["_NP _VP"],
-        "_NP" : ["_N",
-                "_A _NP _P _A _N"],
-        "_VP" : ["_V",
-                "_V _NP"],
-        "_N"  : ["data science", "Python", "regression"],
-        "_A"  : ["big", "linear", "logistic"],
-        "_P"  : ["about", "near"],
-        "_V"  : ["learns", "trains", "tests", "is"]
-    }
-
-    documents = [
-        ["Hadoop", "Big Data", "HBase", "Java", "Spark", "Storm", "Cassandra"],
-        ["NoSQL", "MongoDB", "Cassandra", "HBase", "Postgres"],
-        ["Python", "scikit-learn", "scipy", "numpy", "statsmodels", "pandas"],
-        ["R", "Python", "statistics", "regression", "probability"],
-        ["machine learning", "regression", "decision trees", "libsvm"],
-        ["Python", "R", "Java", "C++", "Haskell", "programming languages"],
-        ["statistics", "probability", "mathematics", "theory"],
-        ["machine learning", "scikit-learn", "Mahout", "neural networks"],
-        ["neural networks", "deep learning", "Big Data", "artificial intelligence"],
-        ["Hadoop", "Java", "MapReduce", "Big Data"],
-        ["statistics", "R", "statsmodels"],
-        ["C++", "deep learning", "artificial intelligence", "probability"],
-        ["pandas", "R", "Python"],
-        ["databases", "HBase", "Postgres", "MySQL", "MongoDB"],
-        ["libsvm", "regression", "support vector machines"]
-    ]
-
-    K = 4
-    document_topic_counts = [Counter() for _ in documents]
-    topic_word_counts = [Counter() for _ in range(K)]
-    topic_counts = [0 for _ in range(K)]
-    document_lengths = [len(document) for document in documents]
-    distinct_words = set(word for document in documents for word in document)
-    W = len(distinct_words)
-    D = len(documents)
-
-    random.seed(0)
-    document_topics = [[random.randrange(K) for word in document]
-                    for document in documents]
-
-    for d in range(D):
-        for word, topic in zip(documents[d], document_topics[d]):
-            document_topic_counts[d][topic] += 1
-            topic_word_counts[topic][word] += 1
-            topic_counts[topic] += 1
-
-
-    for iter in tqdm.trange(1000):
-        for d in range(D):
-            for i, (word, topic) in enumerate(zip(documents[d],
-                                                document_topics[d])):
-                document_topic_counts[d][topic] -= 1
-                topic_word_counts[topic][word] -= 1
-                topic_counts[topic] -= 1
-                document_lengths[d] -= 1
-
-                new_topic = choose_new_topic(d, word)
-                document_topics[d][i] = new_topic
-
-                document_topic_counts[d][new_topic] += 1
-                topic_word_counts[new_topic][word] += 1
-                topic_counts[new_topic] += 1
-                document_lengths[d] += 1
-
-    for k, word_counts in enumerate(topic_word_counts):
-        for word, count in word_counts.most_common():
-            if count > 0:
-                print(k, word, count)
-
-    topic_names = ["Big Data and programming languages",
-                "Python and statistics",
-                "databases",
-                "machine learning"]
-
-    for document, topic_counts in zip(documents, document_topic_counts):
-        print(document)
-        for topic, count in topic_counts.most_common():
-            if count > 0:
-                print(topic_names[topic], count)
-        print()
-
-    colors = ["red", "green", "blue", "yellow", "black", ""]
-    nouns = ["bed", "car", "boat", "cat"]
-    verbs = ["is", "was", "seems"]
-    adverbs = ["very", "quite", "extremely", ""]
-    adjectives = ["slow", "fast", "soft", "hard"]
     NUM_SENTENCES = 50
     sentences = [make_sentence() for _ in range(NUM_SENTENCES)]
 
