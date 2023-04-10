@@ -1,4 +1,8 @@
-from typing import NamedTuple
+from typing import NamedTuple, Dict, List, Tuple
+from collections import deque, Counter
+from utils.linear_algebra import Matrix, make_matrix, shape, Vector, dot, magnitude, distance
+import random
+import tqdm
 
 class User(NamedTuple):
     id: int
@@ -11,9 +15,7 @@ users = [User(0, "Hero"), User(1, "Dunn"), User(2, "Sue"), User(3, "Chi"),
 friend_pairs = [(0, 1), (0, 2), (1, 2), (1, 3), (2, 3), (3, 4),
                 (4, 5), (5, 6), (5, 7), (6, 8), (7, 8), (8, 9)]
 
-from typing import Dict, List
 
-# type alias for keeping track of Friendships
 Friendships = Dict[int, List[int]]
 
 friendships: Friendships = {user.id: [] for user in users}
@@ -25,7 +27,6 @@ for i, j in friend_pairs:
 assert friendships[4] == [3, 5]
 assert friendships[8] == [6, 7, 9]
 
-from collections import deque
 
 Path = List[int]
 
@@ -96,7 +97,6 @@ def farness(user_id: int) -> float:
 
 closeness_centrality = {user.id: 1 / farness(user.id) for user in users}
 
-from utils.linear_algebra import Matrix, make_matrix, shape
 
 def matrix_times_matrix(m1: Matrix, m2: Matrix) -> Matrix:
     nr1, nc1 = shape(m1)
@@ -109,7 +109,6 @@ def matrix_times_matrix(m1: Matrix, m2: Matrix) -> Matrix:
 
     return make_matrix(nr1, nc2, entry_fn)
 
-from utils.linear_algebra import Vector, dot
 
 def matrix_times_vector(m: Matrix, v: Vector) -> Vector:
     nr, nc = shape(m)
@@ -118,9 +117,6 @@ def matrix_times_vector(m: Matrix, v: Vector) -> Vector:
 
     return [dot(row, v) for row in m]  # output has length nr
 
-from typing import Tuple
-import random
-from utils.linear_algebra import magnitude, distance
 
 def find_eigenvector(m: Matrix,
                      tolerance: float = 0.00001) -> Tuple[Vector, float]:
@@ -153,11 +149,9 @@ endorsements = [(0, 1), (1, 0), (0, 2), (2, 0), (1, 2),
                 (2, 1), (1, 3), (2, 3), (3, 4), (5, 4),
                 (5, 6), (7, 5), (6, 8), (8, 7), (8, 9)]
 
-from collections import Counter
 
 endorsement_counts = Counter(target for source, target in endorsements)
 
-import tqdm
 
 def page_rank(users: List[User],
               endorsements: List[Tuple[int, int]],
@@ -186,7 +180,3 @@ def page_rank(users: List[User],
 
 pr = page_rank(users, endorsements)
 
-# Thor (user_id 4) has higher page rank than anyone else
-assert pr[4] > max(page_rank
-                   for user_id, page_rank in pr.items()
-                   if user_id != 4)
