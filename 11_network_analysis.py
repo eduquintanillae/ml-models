@@ -8,27 +8,25 @@ class User(NamedTuple):
     id: int
     name: str
 
-users = [User(0, "Hero"), User(1, "Dunn"), User(2, "Sue"), User(3, "Chi"),
-         User(4, "Thor"), User(5, "Clive"), User(6, "Hicks"),
-         User(7, "Devin"), User(8, "Kate"), User(9, "Klein")]
+Friendships = Dict[int, List[int]]
+Path = List[int]
 
 friend_pairs = [(0, 1), (0, 2), (1, 2), (1, 3), (2, 3), (3, 4),
                 (4, 5), (5, 6), (5, 7), (6, 8), (7, 8), (8, 9)]
 
-
-Friendships = Dict[int, List[int]]
+users = [User(0, "Hero"), User(1, "Dunn"), User(2, "Sue"), User(3, "Chi"),
+        User(4, "Thor"), User(5, "Clive"), User(6, "Hicks"),
+        User(7, "Devin"), User(8, "Kate"), User(9, "Klein")]
 
 friendships: Friendships = {user.id: [] for user in users}
 
 for i, j in friend_pairs:
     friendships[i].append(j)
     friendships[j].append(i)
-
-assert friendships[4] == [3, 5]
-assert friendships[8] == [6, 7, 9]
-
-
-Path = List[int]
+    
+    
+shortest_paths = {user.id: shortest_paths_from(user.id, friendships)
+                for user in users}
 
 def shortest_paths_from(from_user_id: int,
                         friendships: Friendships) -> Dict[int, List[Path]]:
@@ -59,28 +57,10 @@ def shortest_paths_from(from_user_id: int,
 
     return shortest_paths_to
 
-shortest_paths = {user.id: shortest_paths_from(user.id, friendships)
-                  for user in users}
-
-betweenness_centrality = {user.id: 0.0 for user in users}
-
-for source in users:
-    for target_id, paths in shortest_paths[source.id].items():
-        if source.id < target_id:
-            num_paths = len(paths)
-            contrib = 1 / num_paths
-            for path in paths:
-                for between_id in path:
-                    if between_id not in [source.id, target_id]:
-                        betweenness_centrality[between_id] += contrib
-
 def farness(user_id: int) -> float:
     """the sum of the lengths of the shortest paths to each other user"""
     return sum(len(paths[0])
                for paths in shortest_paths[user_id].values())
-
-closeness_centrality = {user.id: 1 / farness(user.id) for user in users}
-
 
 def matrix_times_matrix(m1: Matrix, m2: Matrix) -> Matrix:
     nr1, nc1 = shape(m1)
@@ -116,25 +96,8 @@ def find_eigenvector(m: Matrix,
 
         guess = next_guess
 
-rotate = [[ 0, 1],
-          [-1, 0]]
-
-flip = [[0, 1],
-        [1, 0]]
-
 def entry_fn(i: int, j: int):
     return 1 if (i, j) in friend_pairs or (j, i) in friend_pairs else 0
-
-n = len(users)
-adjacency_matrix = make_matrix(n, n, entry_fn)
-
-endorsements = [(0, 1), (1, 0), (0, 2), (2, 0), (1, 2),
-                (2, 1), (1, 3), (2, 3), (3, 4), (5, 4),
-                (5, 6), (7, 5), (6, 8), (8, 7), (8, 9)]
-
-
-endorsement_counts = Counter(target for source, target in endorsements)
-
 
 def page_rank(users: List[User],
               endorsements: List[Tuple[int, int]],
@@ -155,5 +118,39 @@ def page_rank(users: List[User],
 
     return pr
 
-pr = page_rank(users, endorsements)
+def main():
+    betweenness_centrality = {user.id: 0.0 for user in users}
 
+    for source in users:
+        for target_id, paths in shortest_paths[source.id].items():
+            if source.id < target_id:
+                num_paths = len(paths)
+                contrib = 1 / num_paths
+                for path in paths:
+                    for between_id in path:
+                        if between_id not in [source.id, target_id]:
+                            betweenness_centrality[between_id] += contrib
+    
+    closeness_centrality = {user.id: 1 / farness(user.id) for user in users}
+    
+    
+    rotate = [[ 0, 1],
+            [-1, 0]]
+
+    flip = [[0, 1],
+            [1, 0]]
+
+    n = len(users)
+    adjacency_matrix = make_matrix(n, n, entry_fn)
+
+    endorsements = [(0, 1), (1, 0), (0, 2), (2, 0), (1, 2),
+                    (2, 1), (1, 3), (2, 3), (3, 4), (5, 4),
+                    (5, 6), (7, 5), (6, 8), (8, 7), (8, 9)]
+
+
+    endorsement_counts = Counter(target for source, target in endorsements)
+    pr = page_rank(users, endorsements)
+    
+
+if __name__ == "__main__":
+        main()
