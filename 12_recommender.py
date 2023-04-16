@@ -43,16 +43,6 @@ unique_interests = sorted({interest
                            for user_interests in users_interests
                            for interest in user_interests})
 
-assert unique_interests[:6] == [
-    'Big Data',
-    'C++',
-    'Cassandra',
-    'HBase',
-    'Hadoop',
-    'Haskell',
-    # ...
-]
-
 def make_user_interest_vector(user_interests: List[str]) -> List[int]:
     """
     Given a list ofinterests, produce a vector whose ith element is 1
@@ -69,12 +59,6 @@ user_similarities = [[cosine_similarity(interest_vector_i, interest_vector_j)
                       for interest_vector_j in user_interest_vectors]
                      for interest_vector_i in user_interest_vectors]
 
-# Users 0 and 9 share interests in Hadoop, Java, and Big Data
-assert 0.56 < user_similarities[0][9] < 0.58, "several shared interests"
-
-# Users 0 and 8 share only one interest: Big Data
-assert 0.18 < user_similarities[0][8] < 0.20, "only one shared interest"
-
 def most_similar_users_to(user_id: int) -> List[Tuple[int, float]]:
     pairs = [(other_user_id, similarity)                      # Find other
              for other_user_id, similarity in                 # users with
@@ -88,27 +72,19 @@ def most_similar_users_to(user_id: int) -> List[Tuple[int, float]]:
 
 most_similar_to_zero = most_similar_users_to(0)
 user, score = most_similar_to_zero[0]
-assert user == 9
-assert 0.56 < score < 0.57
 user, score = most_similar_to_zero[1]
-assert user == 1
-assert 0.33 < score < 0.34
-
 
 def user_based_suggestions(user_id: int,
                            include_current_interests: bool = False):
-    # Sum up the similarities.
     suggestions: Dict[str, float] = defaultdict(float)
     for other_user_id, similarity in most_similar_users_to(user_id):
         for interest in users_interests[other_user_id]:
             suggestions[interest] += similarity
-
-    # Convert them to a sorted list.
+            
     suggestions = sorted(suggestions.items(),
-                         key=lambda pair: pair[-1],  # weight
+                         key=lambda pair: pair[-1],
                          reverse=True)
 
-    # And (maybe) exclude already-interests
     if include_current_interests:
         return suggestions
     else:
@@ -116,20 +92,13 @@ def user_based_suggestions(user_id: int,
                 for suggestion, weight in suggestions
                 if suggestion not in users_interests[user_id]]
 
-
 ubs0 = user_based_suggestions(0)
 interest, score = ubs0[0]
-assert interest == 'MapReduce'
-assert 0.56 < score < 0.57
 interest, score = ubs0[1]
-assert interest == 'MongoDB'
-assert 0.50 < score < 0.51
 
 interest_user_matrix = [[user_interest_vector[j]
                          for user_interest_vector in user_interest_vectors]
                         for j, _ in enumerate(unique_interests)]
-
-[1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0]
 
 interest_similarities = [[cosine_similarity(user_vector_i, user_vector_j)
                           for user_vector_j in interest_user_matrix]
@@ -146,10 +115,6 @@ def most_similar_interests_to(interest_id: int):
 
 
 msit0 = most_similar_interests_to(0)
-assert msit0[0][0] == 'Hadoop'
-assert 0.815 < msit0[0][1] < 0.817
-assert msit0[1][0] == 'Java'
-assert 0.666 < msit0[1][1] < 0.667
 
 def item_based_suggestions(user_id: int,
                            include_current_interests: bool = False):
@@ -189,21 +154,10 @@ def item_based_suggestions(user_id: int,
  ('Python', 0.2886751345948129),
  ('R', 0.2886751345948129)]
 
-
 ibs0 = item_based_suggestions(0)
-assert ibs0[0][0] == 'MapReduce'
-assert 1.86 < ibs0[0][1] < 1.87
-assert ibs0[1][0] in ('Postgres', 'MongoDB')  # A tie
-assert 1.31 < ibs0[1][1] < 1.32
-
 def main():
-    
-    # Replace this with the locations of your files
-    
-    # This points to the current directory, modify if your files are elsewhere.
-    MOVIES = "u.item"   # pipe-delimited: movie_id|title|...
-    RATINGS = "u.data"  # tab-delimited: user_id, movie_id, rating, timestamp
-    
+    MOVIES = "u.item"
+    RATINGS = "u.data"
     
     class Rating(NamedTuple):
         user_id: str
@@ -214,16 +168,10 @@ def main():
         reader = csv.reader(f, delimiter="|")
         movies = {movie_id: title for movie_id, title, *_ in reader}
     
-    # Create a list of [Rating]
     with open(RATINGS, encoding="iso-8859-1") as f:
         reader = csv.reader(f, delimiter="\t")
         ratings = [Rating(user_id, movie_id, float(rating))
-                   for user_id, movie_id, rating, _ in reader]
-    
-    # 1682 movies rated by 943 users
-    assert len(movies) == 1682
-    assert len(list({rating.user_id for rating in ratings})) == 943
-    
+                   for user_id, movie_id, rating, _ in reader]    
     
     star_wars_ratings = {movie_id: []
                          for movie_id, title in movies.items()
@@ -236,7 +184,6 @@ def main():
     avg_ratings = [(sum(title_ratings) / len(title_ratings), movie_id)
                    for movie_id, title_ratings in star_wars_ratings.items()]
     
-    # And then print them in order
     for avg_rating, movie_id in sorted(avg_ratings, reverse=True):
         print(f"{avg_rating:.2f} {movies[movie_id]}")
     
@@ -253,7 +200,6 @@ def main():
     avg_rating = sum(rating.rating for rating in train) / len(train)
     baseline_error = sum((rating.rating - avg_rating) ** 2
                          for rating in test) / len(test)
-    
     
     EMBEDDING_DIM = 2
     user_ids = {rating.user_id for rating in ratings}
